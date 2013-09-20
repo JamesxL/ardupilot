@@ -487,7 +487,7 @@ static const struct LogStructure log_structure[] PROGMEM = {
     { LOG_COMPASS_MSG, sizeof(log_Compass),             
       "MAG", "hhhhhhhhh",   "MagX,MagY,MagZ,OfsX,OfsY,OfsZ,MOfsX,MOfsY,MOfsZ" },
     { LOG_RCO_MSG, sizeof(log_RCO),             
-      "MAG", "hh",   "Pit,Rol" },
+      "RCO", "hh",   "Pit,Rol" },
     TECS_LOG_FORMAT(LOG_TECS_MSG),
 };
 
