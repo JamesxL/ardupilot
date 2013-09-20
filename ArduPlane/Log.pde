@@ -448,7 +448,6 @@ static void Log_Write_RCO()
         pitch_ou	: (int16_t)channel_pitch->servo_out,
         roll_out    	: (int16_t)channel_roll->servo_out,
         rudder_out    	: (int16_t)channel_rudder->servo_out,
-        
     };
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
 }
