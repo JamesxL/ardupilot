@@ -51,6 +51,7 @@ print_log_menu(void)
         PLOG(COMPASS);
         PLOG(TECS);
         PLOG(CAMERA);
+        PLOG(RCO);
  #undef PLOG
     }
 
@@ -142,6 +143,7 @@ select_logs(uint8_t argc, const Menu::arg *argv)
         TARG(COMPASS);
         TARG(TECS);
         TARG(CAMERA);
+        TARG(RCO);
  #undef TARG
     }
 
@@ -425,6 +427,33 @@ static void Log_Write_Compass()
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
 }
 
+
+
+//Write RC PWM output log
+struct PACKED log_RCO {
+    LOG_PACKET_HEADER;
+    int16_t throttle_out;
+    int16_t rudder_out;
+    int16_t pitch_out;
+    int16_t roll_out;
+   
+};
+
+// Write a RCOutput packet. Total length : 
+static void Log_Write_RCO()
+{
+        struct log_Compass pkt = {
+        LOG_PACKET_HEADER_INIT(LOG_RCO_MSG),
+        throttle_out    : (int16_t)channel_throttle->servo_out,
+        pitch_ou	: (int16_t)channel_pitch->servo_out,
+        roll_out    	: (int16_t)channel_roll->servo_out,
+        rudder_out    	: (int16_t)channel_rudder->servo_out,
+        
+    };
+    DataFlash.WriteBlock(&pkt, sizeof(pkt));
+}
+
+
 static void Log_Write_GPS(void)
 {
     DataFlash.Log_Write_GPS(g_gps, current_loc.alt);
@@ -434,6 +463,7 @@ static void Log_Write_IMU()
 {
     DataFlash.Log_Write_IMU(&ins);
 }
+
 
 static const struct LogStructure log_structure[] PROGMEM = {
     LOG_COMMON_STRUCTURES,
@@ -457,6 +487,8 @@ static const struct LogStructure log_structure[] PROGMEM = {
       "CURR", "hhhHf",      "Thr,Volt,Curr,Vcc,CurrTot" },
     { LOG_COMPASS_MSG, sizeof(log_Compass),             
       "MAG", "hhhhhhhhh",   "MagX,MagY,MagZ,OfsX,OfsY,OfsZ,MOfsX,MOfsY,MOfsZ" },
+    { LOG_RCO_MSG, sizeof(log_RCO),             
+      "MAG", "hhhh",   "Thr,pit,rol,rud" },
     TECS_LOG_FORMAT(LOG_TECS_MSG),
 };
 
@@ -498,6 +530,7 @@ static void Log_Write_Mode(uint8_t mode) {}
 static void Log_Write_Compass() {}
 static void Log_Write_GPS() {}
 static void Log_Write_IMU() {}
+static void Log_Write_RCO() {}
 
 static int8_t process_logs(uint8_t argc, const Menu::arg *argv) {
     return 0;
