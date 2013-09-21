@@ -432,10 +432,10 @@ static void Log_Write_Compass()
 //Write RC PWM output log
 struct PACKED log_RCO {
     LOG_PACKET_HEADER;
-    //int16_t throttle_out;
-    //int16_t rudder_out;
+    int16_t throttle_out;
     int16_t pitch_out;
     int16_t roll_out;
+    int16_t rudder_out;
    
 };
 
@@ -444,10 +444,10 @@ static void Log_Write_RCO()
 {
         struct log_RCO pkt = {
         LOG_PACKET_HEADER_INIT(LOG_RCO_MSG),
-        //throttle_out    : (int16_t)channel_throttle->servo_out,
+        throttle_out    : (int16_t)channel_throttle->servo_out,
         pitch_out	    : (int16_t)channel_pitch->servo_out,
         roll_out    	: (int16_t)channel_roll->servo_out,
-        //rudder_out    	: (int16_t)channel_rudder->servo_out,
+        rudder_out    	: (int16_t)channel_rudder->servo_out,
     };
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
 }
@@ -487,7 +487,7 @@ static const struct LogStructure log_structure[] PROGMEM = {
     { LOG_COMPASS_MSG, sizeof(log_Compass),             
       "MAG", "hhhhhhhhh",   "MagX,MagY,MagZ,OfsX,OfsY,OfsZ,MOfsX,MOfsY,MOfsZ" },
     { LOG_RCO_MSG, sizeof(log_RCO),             
-      "RCO", "hh",        "Pit,Rol" },
+      "RCO", "hhhh",        "Thr,Pit,Rol,Rud" },
     TECS_LOG_FORMAT(LOG_TECS_MSG),
 };
 
