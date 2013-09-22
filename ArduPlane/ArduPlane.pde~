@@ -816,9 +816,9 @@ static void fast_loop()
 
     if (g.log_bitmask & MASK_LOG_IMU)
         Log_Write_IMU();
-    if (g.log_bitmask & MASK_LOG_RCI)
+    if (g.log_bigmask & MASK_LOG_RCI)
         Log_Write_RCI();
-    if (g.log_bitmask & MASK_LOG_RCO)
+    if (g.log_bigmask & MASK_LOG_RCO)
         Log_Write_RCO();
     //Log_Write_RCI();
     //Log_Write_RCO();
