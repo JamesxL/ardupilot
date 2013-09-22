@@ -638,6 +638,7 @@
     MASK_LOG_TECS | \
     MASK_LOG_RCO | \
     MASK_LOG_RCI | \
+    MASK_LOG_AIRSPD | \
     MASK_LOG_CAMERA
 
 

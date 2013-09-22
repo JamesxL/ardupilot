@@ -162,6 +162,7 @@ enum log_messages {
     LOG_TECS_MSG,
     LOG_RCO_MSG,
     LOG_RCI_MSG,
+    LOG_AIRSPD_MSG,
     MAX_NUM_LOGS // always at the end
 };
 
@@ -180,6 +181,7 @@ enum log_messages {
 #define MASK_LOG_CAMERA                 (1<<12)
 #define MASK_LOG_RCO                    (1<<13)
 #define MASK_LOG_RCI                    (1<<14)
+#define MASK_LOG_AIRSPD                 (1<<15)
 
 // Waypoint Modes
 // ----------------

@@ -905,6 +905,8 @@ static void update_logging(void)
     
     if (g.log_bitmask & MASK_LOG_NTUN)
         Log_Write_Nav_Tuning();
+    if (g.log_bitmask & MASK_LOG_AIRSPD)
+        Log_Write_AIRSPD();
 }
 
 /*
