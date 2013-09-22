@@ -366,7 +366,7 @@ struct PACKED log_AIRSPD {
 //Write an airspeed packet
 static void Log_Write_AIRSPD()
 {
-    struct log_Nav_Tuning pkt = {
+    struct log_AIRSPD pkt = {
         LOG_PACKET_HEADER_INIT(LOG_AIRSPD_MSG),
         airspeed_cm         : (int16_t)airspeed.get_airspeed_cm()
     };
@@ -532,7 +532,7 @@ static const struct LogStructure log_structure[] PROGMEM = {
     { LOG_RCI_MSG, sizeof(log_RCI),             
       "RCI", "hhhh",        "ThrIn,PitIn,RolIn,RudIn" },
     { LOG_AIRSPD_MSG, sizeof(log_AIRSPD),             
-      "AIRSPD", "c",        "AIRSPD" },
+      "ASPD", "c",        "AIRSPD" },
     TECS_LOG_FORMAT(LOG_TECS_MSG),
 };
 

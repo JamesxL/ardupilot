@@ -532,7 +532,7 @@ static const struct LogStructure log_structure[] PROGMEM = {
     { LOG_RCI_MSG, sizeof(log_RCI),             
       "RCI", "hhhh",        "ThrIn,PitIn,RolIn,RudIn" },
     { LOG_AIRSPD_MSG, sizeof(log_AIRSPD),             
-      "AIRSPD", "c",        "AIRSPD" },
+      "ASPD", "c",        "AIRSPD" },
     TECS_LOG_FORMAT(LOG_TECS_MSG),
 };
 
@@ -575,7 +575,8 @@ static void Log_Write_Compass() {}
 static void Log_Write_GPS() {}
 static void Log_Write_IMU() {}
 static void Log_Write_RCO() {}
-
+static void Log_Write_RCI() {}
+static void Log_Write_AIRSPD() {}
 static int8_t process_logs(uint8_t argc, const Menu::arg *argv) {
     return 0;
 }
