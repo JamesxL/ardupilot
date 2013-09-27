@@ -41,6 +41,11 @@ bool ToneAlarm_PX4::init()
         hal.console->printf("Unable to open " TONEALARM_DEVICE_PATH);
         return false;
     }
+    
+    // set initial boot states. This prevents us issueing a arming
+    // warning in plane and rover on every boot
+    flags.armed = AP_Notify::flags.armed;
+    flags.failsafe_battery = AP_Notify::flags.failsafe_battery;
     return true;
 }
 
@@ -56,7 +61,7 @@ bool ToneAlarm_PX4::play_tune(const uint8_t tune_number)
 void ToneAlarm_PX4::update()
 {
     // exit immediately if we haven't initialised successfully
-    if (_tonealarm_fd <= 0 ) {
+    if (_tonealarm_fd == -1) {
         return;
     }
 
@@ -78,6 +83,24 @@ void ToneAlarm_PX4::update()
         if (flags.failsafe_battery) {
             // low battery warning tune
             play_tune(TONE_BATTERY_WARNING_FAST_TUNE);
+        }
+    }
+
+    // check gps glitch
+    if (flags.gps_glitching != AP_Notify::flags.gps_glitching) {
+        flags.gps_glitching = AP_Notify::flags.gps_glitching;
+        if (flags.gps_glitching) {
+            // gps glitch warning tune
+            play_tune(TONE_GPS_WARNING_TUNE);
+        }
+    }
+
+    // check gps failsafe
+    if (flags.failsafe_gps != AP_Notify::flags.failsafe_gps) {
+        flags.failsafe_gps = AP_Notify::flags.failsafe_gps;
+        if (flags.failsafe_gps) {
+            // gps glitch warning tune
+            play_tune(TONE_GPS_WARNING_TUNE);
         }
     }
 }

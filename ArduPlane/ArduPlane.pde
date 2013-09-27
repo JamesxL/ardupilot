@@ -91,6 +91,7 @@ static AP_Vehicle::FixedWing aparm;
 #include <AP_HAL_AVR.h>
 #include <AP_HAL_AVR_SITL.h>
 #include <AP_HAL_PX4.h>
+#include <AP_HAL_FLYMAPLE.h>
 #include <AP_HAL_Empty.h>
 
 AP_HAL::BetterStream* cliSerial;
@@ -246,6 +247,8 @@ AP_InertialSensor_PX4 ins;
 AP_InertialSensor_Stub ins;
 #elif CONFIG_INS_TYPE == CONFIG_INS_OILPAN
 AP_InertialSensor_Oilpan ins( &apm1_adc );
+#elif CONFIG_INS_TYPE == CONFIG_INS_FLYMAPLE
+AP_InertialSensor_Flymaple ins;
 #else
   #error Unrecognised CONFIG_INS_TYPE setting.
 #endif // CONFIG_INS_TYPE
@@ -310,10 +313,8 @@ static AP_Camera camera(&relay);
 // Global variables
 ////////////////////////////////////////////////////////////////////////////////
 
-// APM2 only
-#if USB_MUX_PIN > 0
+// remember if USB is connected, so we can adjust baud rate
 static bool usb_connected;
-#endif
 
 /* Radio values
  *               Channel assignments
@@ -712,7 +713,7 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { gcs_data_stream_send,   1,   3000 },
     { update_mount,           1,   1500 },
     { update_events,		 15,   1500 },
-    { check_usb_mux,          5,   1000 },
+    { check_usb_mux,          5,    200 },
     { read_battery,           5,   1000 },
     { compass_accumulate,     1,   1500 },
     { barometer_accumulate,   1,    900 }, // 20
@@ -738,9 +739,11 @@ void setup() {
     AP_Param::setup_sketch_defaults();
 
     // arduplane does not use arming nor pre-arm checks
-    notify.init();
     AP_Notify::flags.armed = true;
     AP_Notify::flags.pre_arm_check = true;
+    AP_Notify::flags.failsafe_battery = false;
+
+    notify.init();
 
     rssi_analog_source = hal.analogin->channel(ANALOG_INPUT_NONE);
 
@@ -758,9 +761,8 @@ void setup() {
 void loop()
 {
     uint32_t timer = millis();
-    // We want this to execute at 50Hz, but synchronised with the gyro/accel
-    uint16_t num_samples = ins.num_samples_available();
-    if (num_samples >= 1) {
+    // We want this to execute at 50Hz, synchronised with the gyro/accel
+    if (ins.sample_available()) {
         delta_ms_fast_loop      = timer - fast_loopTimer_ms;
         G_Dt                = delta_ms_fast_loop * 0.001f;
         fast_loopTimer_ms   = timer;

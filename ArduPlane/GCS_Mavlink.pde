@@ -25,7 +25,7 @@ static bool	gcs_out_of_time;
 static NOINLINE void send_heartbeat(mavlink_channel_t chan)
 {
     uint8_t base_mode = MAV_MODE_FLAG_CUSTOM_MODE_ENABLED;
-    uint8_t system_status = MAV_STATE_ACTIVE;
+    uint8_t system_status = is_flying() ? MAV_STATE_ACTIVE : MAV_STATE_STANDBY;
     uint32_t custom_mode = control_mode;
     
     if (failsafe.state != FAILSAFE_NONE) {
@@ -309,6 +309,7 @@ static void NOINLINE send_gps_raw(mavlink_channel_t chan)
         g_gps->num_sats);
 }
 
+#if HIL_MODE != HIL_MODE_DISABLED
 static void NOINLINE send_servo_out(mavlink_channel_t chan)
 {
     // normalized values scaled to -10000 to 10000
@@ -328,6 +329,7 @@ static void NOINLINE send_servo_out(mavlink_channel_t chan)
         0,
         receiver_rssi);
 }
+#endif
 
 static void NOINLINE send_radio_in(mavlink_channel_t chan)
 {
@@ -421,17 +423,25 @@ static void NOINLINE send_raw_imu1(mavlink_channel_t chan)
 
 static void NOINLINE send_raw_imu2(mavlink_channel_t chan)
 {
-    int32_t pressure = barometer.get_pressure();
+    float pressure = barometer.get_pressure();
     mavlink_msg_scaled_pressure_send(
         chan,
         millis(),
-        pressure/100.0,
-        (pressure - barometer.get_ground_pressure())/100.0,
-        barometer.get_temperature());
+        pressure*0.01f, // hectopascal
+        (pressure - barometer.get_ground_pressure())*0.01f, // hectopascal
+        barometer.get_temperature()*100); // 0.01 degrees C
 }
 
 static void NOINLINE send_raw_imu3(mavlink_channel_t chan)
 {
+    // run this message at a much lower rate - otherwise it
+    // pointlessly wastes quite a lot of bandwidth
+    static uint8_t counter;
+    if (counter++ < 10) {
+        return;
+    }
+    counter = 0;
+
     Vector3f mag_offsets = compass.get_offsets();
     Vector3f accel_offsets = ins.get_accel_offsets();
     Vector3f gyro_offsets = ins.get_gyro_offsets();
@@ -441,8 +451,8 @@ static void NOINLINE send_raw_imu3(mavlink_channel_t chan)
                                     mag_offsets.y,
                                     mag_offsets.z,
                                     compass.get_declination(),
-                                    barometer.get_raw_pressure(),
-                                    barometer.get_raw_temp(),
+                                    barometer.get_pressure(),
+                                    barometer.get_temperature()*100,
                                     gyro_offsets.x,
                                     gyro_offsets.y,
                                     gyro_offsets.z,
@@ -515,22 +525,13 @@ static bool telemetry_delayed(mavlink_channel_t chan)
     if (tnow > (uint32_t)g.telem_delay) {
         return false;
     }
-#if USB_MUX_PIN > 0
-    if (chan == MAVLINK_COMM_0 && usb_connected) {
-        // this is an APM2 with USB telemetry
+    if (chan == MAVLINK_COMM_0 && hal.gpio->usb_connected()) {
+        // this is USB telemetry, so won't be an Xbee
         return false;
     }
     // we're either on the 2nd UART, or no USB cable is connected
-    // we need to delay telemetry
+    // we need to delay telemetry by the TELEM_DELAY time
     return true;
-#else
-    if (chan == MAVLINK_COMM_0) {
-        // we're on the USB port
-        return false;
-    }
-    // don't send telemetry yet
-    return true;
-#endif
 }
 
 
@@ -590,8 +591,10 @@ static bool mavlink_try_send_message(mavlink_channel_t chan, enum ap_message id,
         break;
 
     case MSG_SERVO_OUT:
+#if HIL_MODE != HIL_MODE_DISABLED
         CHECK_PAYLOAD_SIZE(RC_CHANNELS_SCALED);
         send_servo_out(chan);
+#endif
         break;
 
     case MSG_RADIO_IN:
@@ -1190,7 +1193,7 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
             if (packet.param5 == 1) {
                 float trim_roll, trim_pitch;
                 AP_InertialSensor_UserInteract_MAVLink interact(chan);
-                if(ins.calibrate_accel(flash_leds, &interact, trim_roll, trim_pitch)) {
+                if(ins.calibrate_accel(&interact, trim_roll, trim_pitch)) {
                     // reset ahrs's trim to suggested values from calibration routine
                     ahrs.set_trim(Vector3f(trim_roll, trim_pitch, 0));
                 }
