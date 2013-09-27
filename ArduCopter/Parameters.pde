@@ -1039,6 +1039,10 @@ const AP_Param::Info var_info[] PROGMEM = {
     GOBJECT(fence,      "FENCE_",   AC_Fence),
 #endif
 
+    // @Group: GPSGLITCH_
+    // @Path: ../libraries/AP_GPS/AP_GPS_Glitch.cpp
+    GOBJECT(gps_glitch,      "GPSGLITCH_",   GPS_Glitch),
+
 #if FRAME_CONFIG ==     HELI_FRAME
     // @Group: H_
     // @Path: ../libraries/AP_Motors/AP_MotorsHeli.cpp
@@ -1075,15 +1079,6 @@ static void load_parameters(void)
     if (!ahrs._kp_yaw.load()) {
         ahrs._kp_yaw.set_and_save(0.1);
     }
-
-#if SECONDARY_DMP_ENABLED == ENABLED
-    if (!ahrs2._kp.load()) {
-        ahrs2._kp.set(0.1);
-    }
-    if (!ahrs2._kp_yaw.load()) {
-        ahrs2._kp_yaw.set(0.1);
-    }
-#endif
 
     // setup different Compass learn setting for ArduCopter than the default
     // but allow users to override in their config

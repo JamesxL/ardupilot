@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#define THISFIRMWARE "ArduRover v2.43beta4"
+#define THISFIRMWARE "ArduRover v2.43beta5"
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -97,6 +97,7 @@
 #include <AP_HAL_AVR.h>
 #include <AP_HAL_AVR_SITL.h>
 #include <AP_HAL_PX4.h>
+#include <AP_HAL_FLYMAPLE.h>
 #include <AP_HAL_Empty.h>
 #include "compat.h"
 
@@ -237,6 +238,8 @@ AP_InertialSensor_MPU6000 ins;
 AP_InertialSensor_PX4 ins;
 #elif CONFIG_INS_TYPE == CONFIG_INS_STUB
 AP_InertialSensor_Stub ins;
+#elif CONFIG_INS_TYPE == CONFIG_INS_FLYMAPLE
+AP_InertialSensor_Flymaple ins;
 #elif CONFIG_INS_TYPE == CONFIG_INS_OILPAN
 AP_InertialSensor_Oilpan ins( &adc );
 #else
@@ -305,10 +308,8 @@ AP_Mount camera_mount(&current_loc, g_gps, &ahrs, 0);
 // Global variables
 ////////////////////////////////////////////////////////////////////////////////
 
-// APM2 only
-#if USB_MUX_PIN > 0
+// if USB is connected
 static bool usb_connected;
-#endif
 
 /* Radio values
 		Channel assignments
@@ -585,10 +586,12 @@ void setup() {
     // load the default values of variables listed in var_info[]
     AP_Param::setup_sketch_defaults();
 
-    // arduplane does not use arming nor pre-arm checks
-    notify.init();
+    // rover does not use arming nor pre-arm checks
     AP_Notify::flags.armed = true;
     AP_Notify::flags.pre_arm_check = true;
+    AP_Notify::flags.failsafe_battery = false;
+
+    notify.init();
 
     rssi_analog_source = hal.analogin->channel(ANALOG_INPUT_NONE);
     vcc_pin = hal.analogin->channel(ANALOG_INPUT_BOARD_VCC);
@@ -608,9 +611,8 @@ void loop()
 {
     uint32_t timer = millis();
 
-    // We want this to execute at 50Hz, but synchronised with the gyro/accel
-    uint16_t num_samples = ins.num_samples_available();
-    if (num_samples >= 1) {
+    // We want this to execute at 50Hz, synchronised with the gyro/accel
+    if (ins.sample_available()) {
 		delta_ms_fast_loop	= timer - fast_loopTimer;
 		G_Dt                = (float)delta_ms_fast_loop / 1000.f;
 		fast_loopTimer      = timer;
