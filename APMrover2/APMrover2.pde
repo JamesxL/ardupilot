@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#define THISFIRMWARE "ArduRover v2.43beta5"
+#define THISFIRMWARE "ArduRover v2.43beta6"
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -98,6 +98,7 @@
 #include <AP_HAL_AVR_SITL.h>
 #include <AP_HAL_PX4.h>
 #include <AP_HAL_FLYMAPLE.h>
+#include <AP_HAL_Linux.h>
 #include <AP_HAL_Empty.h>
 #include "compat.h"
 
@@ -236,8 +237,8 @@ AP_GPS_HIL      g_gps_driver;
 AP_InertialSensor_MPU6000 ins;
 #elif CONFIG_INS_TYPE == CONFIG_INS_PX4
 AP_InertialSensor_PX4 ins;
-#elif CONFIG_INS_TYPE == CONFIG_INS_STUB
-AP_InertialSensor_Stub ins;
+#elif CONFIG_INS_TYPE == CONFIG_INS_HIL
+AP_InertialSensor_HIL ins;
 #elif CONFIG_INS_TYPE == CONFIG_INS_FLYMAPLE
 AP_InertialSensor_Flymaple ins;
 #elif CONFIG_INS_TYPE == CONFIG_INS_OILPAN
@@ -569,7 +570,7 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { update_events,         15,   1000 },
     { check_usb_mux,         15,   1000 },
     { mount_update,           1,    500 },
-    { failsafe_check,         5,    500 },
+    { gcs_failsafe_check,     5,    500 },
     { compass_accumulate,     1,    900 },
     { update_notify,          1,    100 },
     { one_second_loop,       50,   3000 }
@@ -628,6 +629,10 @@ void loop()
 		fast_loopTimeStamp = millis();
 
         scheduler.run(19000U);
+    }
+    if ((timer - fast_loopTimer) <= 19) {
+        // we have plenty of time - be friendly to multi-tasking OSes
+        hal.scheduler->delay(1);
     }
 }
 
@@ -690,7 +695,7 @@ static void mount_update(void)
 /*
   check for GCS failsafe - 10Hz
  */
-static void failsafe_check(void)
+static void gcs_failsafe_check(void)
 {
 	if (g.fs_gcs_enabled) {
         failsafe_trigger(FAILSAFE_EVENT_GCS, last_heartbeat_ms != 0 && (millis() - last_heartbeat_ms) > 2000);
@@ -864,9 +869,18 @@ static void update_current_mode(void)
 
     case STEERING: {
         /*
-          in steering mode we control lateral acceleration directly
+          in steering mode we control lateral acceleration
+          directly. We first calculate the maximum lateral
+          acceleration at full steering lock for this speed. That is
+          V^2/R where R is the radius of turn. We get the radius of
+          turn from half the STEER2SRV_P.
          */
-        lateral_acceleration = g.turn_max_g * GRAVITY_MSS * (channel_steer->pwm_to_angle()/4500.0f);
+        float max_g_force = ground_speed * ground_speed / steerController.get_turn_radius();
+
+        // constrain to user set TURN_MAX_G
+        max_g_force = constrain_float(max_g_force, 0.1f, g.turn_max_g * GRAVITY_MSS);
+
+        lateral_acceleration = max_g_force * (channel_steer->pwm_to_angle()/4500.0f);
         calc_nav_steer();
 
         // and throttle gives speed in proportion to cruise speed

@@ -92,6 +92,7 @@ static AP_Vehicle::FixedWing aparm;
 #include <AP_HAL_AVR_SITL.h>
 #include <AP_HAL_PX4.h>
 #include <AP_HAL_FLYMAPLE.h>
+#include <AP_HAL_Linux.h>
 #include <AP_HAL_Empty.h>
 
 AP_HAL::BetterStream* cliSerial;
@@ -153,6 +154,8 @@ DataFlash_APM2 DataFlash;
 DataFlash_SITL DataFlash;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_PX4
 static DataFlash_File DataFlash("/fs/microsd/APM/logs");
+#elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
+static DataFlash_File DataFlash("/var/log/APM/logs");
 #else
 // no dataflash driver
 DataFlash_Empty DataFlash;
@@ -177,10 +180,6 @@ static GPS         *g_gps;
 
 // flight modes convenience array
 static AP_Int8          *flight_modes = &g.flight_mode1;
-
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM1
-AP_ADC_ADS7844 apm1_adc;
-#endif
 
 #if CONFIG_BARO == AP_BARO_BMP085
 static AP_Baro_BMP085 barometer;
@@ -239,12 +238,16 @@ AP_GPS_HIL      g_gps_driver;
   #error Unrecognised GPS_PROTOCOL setting.
 #endif // GPS PROTOCOL
 
+#if CONFIG_INS_TYPE == CONFIG_INS_OILPAN || CONFIG_HAL_BOARD == HAL_BOARD_APM1
+AP_ADC_ADS7844 apm1_adc;
+#endif
+
 #if CONFIG_INS_TYPE == CONFIG_INS_MPU6000
 AP_InertialSensor_MPU6000 ins;
 #elif CONFIG_INS_TYPE == CONFIG_INS_PX4
 AP_InertialSensor_PX4 ins;
-#elif CONFIG_INS_TYPE == CONFIG_INS_STUB
-AP_InertialSensor_Stub ins;
+#elif CONFIG_INS_TYPE == CONFIG_INS_HIL
+AP_InertialSensor_HIL ins;
 #elif CONFIG_INS_TYPE == CONFIG_INS_OILPAN
 AP_InertialSensor_Oilpan ins( &apm1_adc );
 #elif CONFIG_INS_TYPE == CONFIG_INS_FLYMAPLE
@@ -681,10 +684,6 @@ AP_Mount camera_mount(&current_loc, g_gps, &ahrs, 0);
 AP_Mount camera_mount2(&current_loc, g_gps, &ahrs, 1);
 #endif
 
-#if CAMERA == ENABLED
-//pinMode(camtrig, OUTPUT);			// these are free pins PE3(5), PH3(15), PH6(18), PB4(23), PB5(24), PL1(36), PL3(38), PA6(72), PA7(71), PK0(89), PK1(88), PK2(87), PK3(86), PK4(83), PK5(84), PK6(83), PK7(82)
-#endif
-
 ////////////////////////////////////////////////////////////////////////////////
 // Top-level logic
 ////////////////////////////////////////////////////////////////////////////////
@@ -782,6 +781,10 @@ void loop()
         // the first call to the scheduler they won't run on a later
         // call until scheduler.tick() is called again
         scheduler.run(19000U);
+    }
+    if ((timer - fast_loopTimer_ms) <= 19) {
+        // we have plenty of time - be friendly to multi-tasking OSes
+        hal.scheduler->delay(1);
     }
 }
 

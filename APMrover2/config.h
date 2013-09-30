@@ -68,7 +68,7 @@
 # define BATTERY_PIN_1	  1
 # define CURRENT_PIN_1	  2
 #elif CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
-# define CONFIG_INS_TYPE CONFIG_INS_STUB
+# define CONFIG_INS_TYPE CONFIG_INS_HIL
 # define CONFIG_COMPASS  AP_COMPASS_HIL
 # define BATTERY_PIN_1	  1
 # define CURRENT_PIN_1	  2
@@ -82,6 +82,11 @@
 # define CONFIG_COMPASS  AP_COMPASS_HMC5843
 # define BATTERY_PIN_1     20
 # define CURRENT_PIN_1	   19
+#elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
+# define CONFIG_INS_TYPE   CONFIG_INS_HIL
+# define CONFIG_COMPASS  AP_COMPASS_HMC5843
+# define BATTERY_PIN_1     -1
+# define CURRENT_PIN_1	   -1
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -102,7 +107,7 @@
  #undef GPS_PROTOCOL
  #define GPS_PROTOCOL GPS_PROTOCOL_HIL
  #undef CONFIG_INS_TYPE
- #define CONFIG_INS_TYPE CONFIG_INS_STUB
+ #define CONFIG_INS_TYPE CONFIG_INS_HIL
  #undef  CONFIG_COMPASS
  #define CONFIG_COMPASS  AP_COMPASS_HIL
 #endif

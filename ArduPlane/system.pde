@@ -137,9 +137,9 @@ static void init_ardupilot()
     }
 #endif
 
- #if CONFIG_HAL_BOARD == HAL_BOARD_APM1
+#if CONFIG_INS_TYPE == CONFIG_INS_OILPAN || CONFIG_HAL_BOARD == HAL_BOARD_APM1
     apm1_adc.Init();      // APM ADC library initialization
- #endif
+#endif
 
     // initialise airspeed sensor
     airspeed.init();
@@ -171,7 +171,7 @@ static void init_ardupilot()
     relay.init();
 
 #if FENCE_TRIGGERED_PIN > 0
-    pinMode(FENCE_TRIGGERED_PIN, OUTPUT);
+    hal.gpio->pinMode(FENCE_TRIGGERED_PIN, OUTPUT);
     digitalWrite(FENCE_TRIGGERED_PIN, LOW);
 #endif
 

@@ -79,6 +79,7 @@
 #include <AP_HAL_AVR_SITL.h>
 #include <AP_HAL_PX4.h>
 #include <AP_HAL_FLYMAPLE.h>
+#include <AP_HAL_Linux.h>
 #include <AP_HAL_Empty.h>
 
 // Application dependencies
@@ -222,7 +223,7 @@ static AP_InertialSensor_MPU6000 ins;
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_OILPAN
 static AP_InertialSensor_Oilpan ins(&adc);
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_SITL
-static AP_InertialSensor_Stub ins;
+static AP_InertialSensor_HIL ins;
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_PX4
 static AP_InertialSensor_PX4 ins;
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_FLYMAPLE
@@ -291,7 +292,7 @@ static AP_ADC_HIL              adc;
 static AP_Baro_HIL      barometer;
 static AP_Compass_HIL          compass;
 static AP_GPS_HIL              g_gps_driver;
-static AP_InertialSensor_Stub  ins;
+static AP_InertialSensor_HIL   ins;
 static AP_AHRS_DCM             ahrs(&ins, g_gps);
 
 static int32_t gps_base_alt;
@@ -303,7 +304,7 @@ static SITL sitl;
 
 #elif HIL_MODE == HIL_MODE_ATTITUDE
 static AP_ADC_HIL              adc;
-static AP_InertialSensor_Stub  ins;
+static AP_InertialSensor_HIL   ins;
 static AP_AHRS_HIL             ahrs(&ins, g_gps);
 static AP_GPS_HIL              g_gps_driver;
 static AP_Compass_HIL          compass;                  // never used
@@ -987,6 +988,10 @@ void loop()
         // call until scheduler.tick() is called again
         uint32_t time_available = (timer + 10000) - micros();
         scheduler.run(time_available - 500);
+    }
+    if ((timer - fast_loopTimer) < 8500) {
+        // we have plenty of time - be friendly to multi-tasking OSes
+        hal.scheduler->delay(1);
     }
 }
 
