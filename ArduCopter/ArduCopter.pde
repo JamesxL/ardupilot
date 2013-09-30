@@ -190,7 +190,7 @@ static DataFlash_Empty DataFlash;
 ////////////////////////////////////////////////////////////////////////////////
 // the rate we run the main loop at
 ////////////////////////////////////////////////////////////////////////////////
-static const AP_InertialSensor::Sample_rate ins_sample_rate = AP_InertialSensor::RATE_100HZ;
+static const AP_InertialSensor::Sample_rate ins_sample_rate = AP_InertialSensor::RATE_200HZ;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Sensors
@@ -963,7 +963,7 @@ void loop()
 
     // We want this to execute fast
     // ----------------------------
-    if (ins.sample_available()) {
+    if (ins.sample_available()>=2) {
 
         // check loop time
         perf_info_check_loop_time(timer - fast_loopTimer);
