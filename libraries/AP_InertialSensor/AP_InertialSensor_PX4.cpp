@@ -31,6 +31,16 @@ uint16_t AP_InertialSensor_PX4::_init_sensor( Sample_rate sample_rate )
         _default_filter_hz = 30;
         _sample_time_usec = 5000;
         break;
+    case RATE_400HZ:
+    default:
+        _default_filter_hz = 30;
+        _sample_time_usec = 2500;
+        break;
+    case RATE_800HZ:
+    default:
+        _default_filter_hz = 30;
+        _sample_time_usec = 1250;
+        break;
     }
 
     _delta_time = _sample_time_usec * 1.0e-6f;
