@@ -536,6 +536,18 @@ bool AP_InertialSensor_MPU6000::hardware_init(Sample_rate sample_rate)
         default_filter = BITS_DLPF_CFG_20HZ;
         _sample_shift = 0;
         break;
+    case RATE_250HZ:
+        default_filter = BITS_DLPF_CFG_20HZ;
+        _sample_shift = 0;
+        break;
+    case RATE_400HZ:
+        default_filter = BITS_DLPF_CFG_20HZ;
+        _sample_shift = 0;
+        break;
+    case RATE_800HZ:
+        default_filter = BITS_DLPF_CFG_20HZ;
+        _sample_shift = 0;
+        break;
     }
 
     _set_filter_register(_mpu6000_filter, default_filter);
