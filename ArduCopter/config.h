@@ -82,7 +82,7 @@
  # define MAGNETOMETER ENABLED
  # define CONFIG_SONAR_SOURCE SONAR_SOURCE_ANALOG_PIN
 #elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
- # define CONFIG_IMU_TYPE CONFIG_IMU_SITL
+ # define CONFIG_IMU_TYPE CONFIG_IMU_L3G4200D
  # define CONFIG_BARO AP_BARO_BMP085
  # define CONFIG_COMPASS  AP_COMPASS_HMC5843
  # define CONFIG_ADC        DISABLED
@@ -349,21 +349,12 @@
 //////////////////////////////////////////////////////////////////////////////
 // Battery monitoring
 //
-#ifndef LOW_VOLTAGE
- # define LOW_VOLTAGE                    10.5f
-#endif
-#ifndef VOLT_DIV_RATIO
- # define VOLT_DIV_RATIO                 3.56f
+#ifndef FS_BATT_VOLTAGE_DEFAULT
+ # define FS_BATT_VOLTAGE_DEFAULT       10.5f       // default battery voltage below which failsafe will be triggered
 #endif
 
-#ifndef CURR_AMP_PER_VOLT
- # define CURR_AMP_PER_VOLT              27.32f
-#endif
-#ifndef CURR_AMPS_OFFSET
- # define CURR_AMPS_OFFSET               0.0f
-#endif
-#ifndef BATTERY_CAPACITY_DEFAULT
- # define BATTERY_CAPACITY_DEFAULT      3500
+#ifndef FS_BATT_MAH_DEFAULT
+ # define FS_BATT_MAH_DEFAULT             0         // default battery capacity (in mah) below which failsafe will be triggered
 #endif
 
 #ifndef BOARD_VOLTAGE_MIN
@@ -409,13 +400,13 @@
 #endif
 
 // expected magnetic field strength.  pre-arm checks will fail if 50% higher or lower than this value
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM2
+#if CONFIG_HAL_BOARD == HAL_BOARD_APM1 || CONFIG_HAL_BOARD == HAL_BOARD_APM2
  #ifndef COMPASS_MAGFIELD_EXPECTED
-  # define COMPASS_MAGFIELD_EXPECTED     330        // pre arm will fail if mag field > 495 or < 165
+  # define COMPASS_MAGFIELD_EXPECTED     330        // pre arm will fail if mag field > 544 or < 115
  #endif
-#else // APM1, PX4, SITL
+#else // PX4, SITL
  #ifndef COMPASS_MAGFIELD_EXPECTED
-  #define COMPASS_MAGFIELD_EXPECTED      530        // pre arm will fail if mag field > 795 or < 265
+  #define COMPASS_MAGFIELD_EXPECTED      530        // pre arm will fail if mag field > 874 or < 185
  #endif
 #endif
 
@@ -454,6 +445,12 @@
 #endif
 #ifndef OPTFLOW_IMAX
  #define OPTFLOW_IMAX 100
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
+//  Auto Tuning
+#ifndef AUTOTUNE
+ # define AUTOTUNE  DISABLED
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
