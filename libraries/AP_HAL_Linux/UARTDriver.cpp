@@ -20,10 +20,16 @@ extern const AP_HAL::HAL& hal;
 
 using namespace Linux;
 
-LinuxUARTDriver::LinuxUARTDriver() :
+LinuxUARTDriver::LinuxUARTDriver(bool default_console) :
     device_path(NULL),
-    _fd(-1)
+    _rd_fd(-1),
+    _wr_fd(-1)
 {
+    if (default_console) {
+        _rd_fd = 0;
+        _wr_fd = 1;
+        _console = true;
+    }
 }
 
 /*
@@ -44,14 +50,21 @@ void LinuxUARTDriver::begin(uint32_t b)
 
 void LinuxUARTDriver::begin(uint32_t b, uint16_t rxS, uint16_t txS) 
 {
-    if (!_initialised) {
+    if (device_path == NULL && _console) {
+        _rd_fd = 0;
+        _wr_fd = 1;
+        rxS = 512;
+        txS = 512;
+        fcntl(_rd_fd, F_SETFL, fcntl(_rd_fd, F_GETFL, 0) | O_NONBLOCK);
+        fcntl(_wr_fd, F_SETFL, fcntl(_wr_fd, F_GETFL, 0) | O_NONBLOCK);
+    } else if (!_initialised) {
         if (device_path == NULL) {
             return;
         }
         uint8_t retries = 0;
         while (retries < 5) {
-            _fd = open(device_path, O_RDWR);
-            if (_fd != -1) {
+            _rd_fd = open(device_path, O_RDWR);
+            if (_rd_fd != -1) {
                 break;
             }
             // sleep a bit and retry. There seems to be a NuttX bug
@@ -60,7 +73,8 @@ void LinuxUARTDriver::begin(uint32_t b, uint16_t rxS, uint16_t txS)
             hal.scheduler->delay(100);
             retries++;
         }
-        if (_fd == -1) {
+        _wr_fd = _rd_fd;
+        if (_rd_fd == -1) {
             fprintf(stdout, "Failed to open UART device %s - %s\n",
                     device_path, strerror(errno));
             return;
@@ -73,31 +87,31 @@ void LinuxUARTDriver::begin(uint32_t b, uint16_t rxS, uint16_t txS)
 
         // always run the file descriptor non-blocking, and deal with
         // blocking IO in the higher level calls
-        fcntl(_fd, F_SETFL, fcntl(_fd, F_GETFL, 0) | O_NONBLOCK);
+        fcntl(_rd_fd, F_SETFL, fcntl(_rd_fd, F_GETFL, 0) | O_NONBLOCK);
         
-        if (rxS == 0) {
-            rxS = 128;
+        if (rxS < 1024) {
+            rxS = 1024;
         }
 
         // we have enough memory to have a larger transmit buffer for
         // all ports. This means we don't get delays while waiting to
         // write GPS config packets
-        if (txS < 512) {
-            txS = 512;
+        if (txS < 1024) {
+            txS = 1024;
         }
     }
 
     _initialised = false;
     while (_in_timer) hal.scheduler->delay(1);
 
-    if (b != 0) {
+    if (b != 0 && _rd_fd == _wr_fd) {
         // set the baud rate
         struct termios t;
-        tcgetattr(_fd, &t);
+        tcgetattr(_rd_fd, &t);
         cfsetspeed(&t, b);
         // disable LF -> CR/LF
         t.c_oflag &= ~ONLCR;
-        tcsetattr(_fd, TCSANOW, &t);
+        tcsetattr(_rd_fd, TCSANOW, &t);
     }
 
     /*
@@ -138,10 +152,11 @@ void LinuxUARTDriver::end()
 {
     _initialised = false;
     while (_in_timer) hal.scheduler->delay(1);
-    if (_fd != -1) {
-        close(_fd);
-        _fd = -1;
+    if (_rd_fd == _wr_fd && _rd_fd != -1) {
+        close(_rd_fd);
     }
+    _rd_fd = -1;
+    _wr_fd = -1;
     if (_readbuf) {
         free(_readbuf);
         _readbuf = NULL;
@@ -243,10 +258,6 @@ size_t LinuxUARTDriver::write(uint8_t c)
     if (!_initialised) {
         return 0;
     }
-    if (hal.scheduler->in_timerprocess()) {
-        // not allowed from timers
-        return 0;
-    }
     uint16_t _head;
 
     while (BUF_SPACE(_writebuf) == 0) {
@@ -268,11 +279,6 @@ size_t LinuxUARTDriver::write(const uint8_t *buffer, size_t size)
     if (!_initialised) {
         return 0;
     }
-    if (hal.scheduler->in_timerprocess()) {
-        // not allowed from timers
-        return 0;
-    }
-
     if (!_nonblocking_writes) {
         /*
           use the per-byte delay loop in write() above for blocking writes
@@ -325,12 +331,12 @@ int LinuxUARTDriver::_write_fd(const uint8_t *buf, uint16_t n)
     int ret = 0;
 
     struct pollfd fds;
-    fds.fd = _fd;
+    fds.fd = _wr_fd;
     fds.events = POLLOUT;
     fds.revents = 0;
 
     if (poll(&fds, 1, 0) == 1) {
-        ret = ::write(_fd, buf, n);
+        ret = ::write(_wr_fd, buf, n);
     }
 
     if (ret > 0) {
@@ -347,7 +353,7 @@ int LinuxUARTDriver::_write_fd(const uint8_t *buf, uint16_t n)
 int LinuxUARTDriver::_read_fd(uint8_t *buf, uint16_t n)
 {
     int ret;
-    ret = ::read(_fd, buf, n);
+    ret = ::read(_rd_fd, buf, n);
     if (ret > 0) {
         BUF_ADVANCETAIL(_readbuf, ret);
     }

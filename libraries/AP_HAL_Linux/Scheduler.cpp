@@ -11,24 +11,39 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <errno.h>
+#include <sys/mman.h>
 
 using namespace Linux;
 
 extern const AP_HAL::HAL& hal;
 
-#define APM_LINUX_MAIN_PRIORITY    180
-#define APM_LINUX_TIMER_PRIORITY   182
-#define APM_LINUX_UART_PRIORITY    181
-#define APM_LINUX_IO_PRIORITY       59
+#define APM_LINUX_TIMER_PRIORITY    13
+#define APM_LINUX_UART_PRIORITY     12
+#define APM_LINUX_MAIN_PRIORITY     11
+#define APM_LINUX_IO_PRIORITY       10
 
 LinuxScheduler::LinuxScheduler()
 {}
 
 typedef void *(*pthread_startroutine_t)(void *);
 
+/*
+  setup for realtime. Lock all of memory in the thread and pre-fault
+  the given stack size, so stack faults don't cause timing jitter
+ */
+void LinuxScheduler::_setup_realtime(uint32_t size) 
+{
+        uint8_t dummy[size];
+        mlockall(MCL_CURRENT|MCL_FUTURE);
+        memset(dummy, 0, sizeof(dummy));
+}
+
 void LinuxScheduler::init(void* machtnichts)
 {
-    gettimeofday(&_sketch_start_time, NULL);
+    clock_gettime(CLOCK_MONOTONIC, &_sketch_start_time);
+
+    _setup_realtime(32768);
 
     pthread_attr_t thread_attr;
     struct sched_param param;
@@ -62,13 +77,21 @@ void LinuxScheduler::init(void* machtnichts)
     pthread_create(&_io_thread_ctx, &thread_attr, (pthread_startroutine_t)&Linux::LinuxScheduler::_io_thread, this);
 }
 
+void LinuxScheduler::_microsleep(uint32_t usec)
+{
+    struct timespec ts;
+    ts.tv_sec = 0;
+    ts.tv_nsec = usec*1000UL;
+    while (nanosleep(&ts, &ts) == -1 && errno == EINTR) ;
+}
+
 void LinuxScheduler::delay(uint16_t ms)
 {
     uint32_t start = millis();
     
     while ((millis() - start) < ms) {
         // this yields the CPU to other apps
-        poll(NULL, 0, 1);
+        _microsleep(1000);
         if (_min_delay_cb_ms <= ms) {
             if (_delay_cb) {
                 _delay_cb();
@@ -79,25 +102,25 @@ void LinuxScheduler::delay(uint16_t ms)
 
 uint32_t LinuxScheduler::millis() 
 {
-    struct timeval tp;
-    gettimeofday(&tp,NULL);
-    return 1.0e3*((tp.tv_sec + (tp.tv_usec*1.0e-6)) - 
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return 1.0e3*((ts.tv_sec + (ts.tv_nsec*1.0e-9)) - 
                   (_sketch_start_time.tv_sec +
-                   (_sketch_start_time.tv_usec*1.0e-6)));
+                   (_sketch_start_time.tv_nsec*1.0e-9)));
 }
 
 uint32_t LinuxScheduler::micros() 
 {
-    struct timeval tp;
-    gettimeofday(&tp,NULL);
-    return 1.0e6*((tp.tv_sec + (tp.tv_usec*1.0e-6)) - 
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return 1.0e6*((ts.tv_sec + (ts.tv_nsec*1.0e-9)) - 
                   (_sketch_start_time.tv_sec +
-                   (_sketch_start_time.tv_usec*1.0e-6)));
+                   (_sketch_start_time.tv_nsec*1.0e-9)));
 }
 
 void LinuxScheduler::delay_microseconds(uint16_t us)
 {
-    usleep(us);
+    _microsleep(us);
 }
 
 void LinuxScheduler::register_delay_callback(AP_HAL::Proc proc,
@@ -139,7 +162,7 @@ void LinuxScheduler::register_io_process(AP_HAL::MemberProc proc)
     }
 }
 
-void LinuxScheduler::register_timer_failsafe(AP_HAL::MemberProc failsafe, uint32_t period_us)
+void LinuxScheduler::register_timer_failsafe(AP_HAL::Proc failsafe, uint32_t period_us)
 {
     _failsafe = failsafe;
 }
@@ -163,7 +186,6 @@ void LinuxScheduler::resume_timer_procs()
 
 void LinuxScheduler::_run_timers(bool called_from_timer_thread)
 {
-    uint32_t tnow = micros();
     if (_in_timer_proc) {
         return;
     }
@@ -173,7 +195,7 @@ void LinuxScheduler::_run_timers(bool called_from_timer_thread)
         // now call the timer based drivers
         for (int i = 0; i < _num_timer_procs; i++) {
             if (_timer_proc[i] != NULL) {
-                _timer_proc[i](_timer_arg[i]);
+                _timer_proc[i]();
             }
         }
     } else if (called_from_timer_thread) {
@@ -182,7 +204,7 @@ void LinuxScheduler::_run_timers(bool called_from_timer_thread)
 
     // and the failsafe, if one is setup
     if (_failsafe != NULL) {
-        _failsafe(NULL);
+        _failsafe();
     }
 
     _in_timer_proc = false;
@@ -190,8 +212,9 @@ void LinuxScheduler::_run_timers(bool called_from_timer_thread)
 
 void *LinuxScheduler::_timer_thread(void)
 {
+    _setup_realtime(32768);
     while (true) {
-        poll(NULL, 0, 1);
+        _microsleep(5000);
 
         // run registered timers
         _run_timers(true);
@@ -202,7 +225,6 @@ void *LinuxScheduler::_timer_thread(void)
 
 void LinuxScheduler::_run_io(void)
 {
-    uint32_t tnow = micros();
     if (_in_io_proc) {
         return;
     }
@@ -212,7 +234,7 @@ void LinuxScheduler::_run_io(void)
         // now call the IO based drivers
         for (int i = 0; i < _num_io_procs; i++) {
             if (_io_proc[i] != NULL) {
-                _io_proc[i](_io_arg[i]);
+                _io_proc[i]();
             }
         }
     }
@@ -222,8 +244,9 @@ void LinuxScheduler::_run_io(void)
 
 void *LinuxScheduler::_uart_thread(void)
 {
+    _setup_realtime(32768);
     while (true) {
-        poll(NULL, 0, 1);
+        _microsleep(10000);
 
         // process any pending serial bytes
         ((LinuxUARTDriver *)hal.uartA)->_timer_tick();
@@ -235,8 +258,9 @@ void *LinuxScheduler::_uart_thread(void)
 
 void *LinuxScheduler::_io_thread(void)
 {
+    _setup_realtime(32768);
     while (true) {
-        poll(NULL, 0, 1);
+        _microsleep(20000);
 
         // process any pending storage writes
         ((LinuxStorage *)hal.storage)->_timer_tick();

@@ -21,8 +21,8 @@ public:
     void     register_delay_callback(AP_HAL::Proc,
                 uint16_t min_time_ms);
 
-    void     register_timer_process(AP_HAL::MemberProc, void *arg);
-    void     register_io_process(AP_HAL::MemberProc, void *arg);
+    void     register_timer_process(AP_HAL::MemberProc);
+    void     register_io_process(AP_HAL::MemberProc);
     void     suspend_timer_procs();
     void     resume_timer_procs();
 
@@ -40,8 +40,9 @@ public:
     void     reboot(bool hold_in_bootloader);
 
 private:
-    struct timeval _sketch_start_time;    
+    struct timespec _sketch_start_time;    
     void _timer_handler(int signum);
+    void _microsleep(uint32_t usec);
 
     AP_HAL::Proc _delay_cb;
     uint16_t _min_delay_cb_ms;
@@ -73,6 +74,7 @@ private:
 
     void _run_timers(bool called_from_timer_thread);
     void _run_io(void);
+    void _setup_realtime(uint32_t size);
 };
 
 #endif // CONFIG_HAL_BOARD
